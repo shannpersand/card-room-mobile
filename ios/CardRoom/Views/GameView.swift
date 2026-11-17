@@ -4,6 +4,11 @@ import SwiftUI
 /// — this view assumes `vm.room.gameId == "blackjack"` (the only mode `LobbyView` can deal).
 struct GameView: View {
     @ObservedObject var vm: RoomViewModel
+    /// Other players' hand rows default to collapsed (name only) and expand on tap — this
+    /// tracks which ones the user has manually expanded. Once the round is over (`allDone`)
+    /// every hand shows regardless, matching the request: toggle-only during play, always
+    /// shown once the game ends.
+    @State private var expandedPlayerIds: Set<String> = []
 
     private var myValue: Int { vm.myPlayer.map { Deck.blackjackValue($0.hand) } ?? 0 }
     private var dealerValue: Int { vm.dealer.map { Deck.blackjackValue($0.hand) } ?? 0 }
@@ -56,21 +61,39 @@ struct GameView: View {
     private func otherPlayerRow(_ player: Player) -> some View {
         let isTurn = vm.room.currentTurn == player.id
         let value = Deck.blackjackValue(player.hand)
+        let isExpanded = allDone || expandedPlayerIds.contains(player.id)
         return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                if isTurn { Circle().fill(.green).frame(width: 8, height: 8) }
-                Text(player.name).font(.subheadline.bold())
-                if player.id == vm.dealer?.id { Text("★").foregroundStyle(.yellow) }
-                Spacer()
-                if player.isStanding {
-                    Text(value > 21 ? "BUST" : "STAND")
-                        .font(.caption.bold())
-                        .foregroundStyle(value > 21 ? .red : .orange)
+            Button {
+                if expandedPlayerIds.contains(player.id) {
+                    expandedPlayerIds.remove(player.id)
+                } else {
+                    expandedPlayerIds.insert(player.id)
                 }
+            } label: {
+                HStack {
+                    if isTurn { Circle().fill(.green).frame(width: 8, height: 8) }
+                    Text(player.name).font(.subheadline.bold())
+                    if player.id == vm.dealer?.id { Text("★").foregroundStyle(.yellow) }
+                    Spacer()
+                    if player.isStanding {
+                        Text(value > 21 ? "BUST" : "STAND")
+                            .font(.caption.bold())
+                            .foregroundStyle(value > 21 ? .red : .orange)
+                    }
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
             }
-            HStack(spacing: 4) {
-                ForEach(player.hand) { card in
-                    CardView(card: card, width: 40, backColor: vm.room.backColor)
+            .buttonStyle(.plain)
+            .disabled(allDone)
+
+            if isExpanded {
+                HStack(spacing: 4) {
+                    ForEach(player.hand) { card in
+                        CardView(card: card, width: 40, backColor: vm.room.backColor)
+                    }
                 }
             }
         }

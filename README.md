@@ -81,7 +81,10 @@ verified" below), not just that it compiles.
   round results), `GolfView` (pre-game peek, draw/swap/discard, Knock!/End Turn, round results),
   `CardView` (the real card art — see below), and `RootView`, which switches between the three
   purely off state (room `state` flipping to `.playing` is what moves you from Lobby to Game,
-  not a navigation push).
+  not a navigation push). In both `GameView` and `GolfView`, other players' rows default to
+  name-only (tap to expand their hand), except once the round ends — at reveal, every hand shows
+  regardless of the toggle. Purely local `@State` per view; not synced or remembered across
+  screens.
 
 ### Card art
 `Assets.xcassets` has the web app's actual card art (`card-room/src/assets/cards/*.svg`), not a

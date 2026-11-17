@@ -4,6 +4,11 @@ import SwiftUI
 /// swap-or-discard, Knock!/End Turn, and round results. Assumes `vm.room.gameId == "golf"`.
 struct GolfView: View {
     @ObservedObject var vm: RoomViewModel
+    /// Other players' grids default to collapsed (name only) and expand on tap — tracks which
+    /// ones the user has manually expanded. Once the round is revealed (`golfRevealed`) every
+    /// grid shows regardless, matching the request: toggle-only during play, always shown once
+    /// the game ends.
+    @State private var expandedPlayerIds: Set<String> = []
 
     var body: some View {
         ScrollView {
@@ -62,17 +67,35 @@ struct GolfView: View {
 
     private func otherPlayerRow(_ player: Player) -> some View {
         let isTurn = vm.room.currentTurn == player.id
+        let isExpanded = vm.golfRevealed || expandedPlayerIds.contains(player.id)
         return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                if isTurn { Circle().fill(.green).frame(width: 8, height: 8) }
-                Text(player.name).font(.subheadline.bold())
-                if player.id == vm.dealer?.id { Text("★").foregroundStyle(.yellow) }
-                Spacer()
-                if player.id == vm.room.golfKnockedBy { Text("knocked").font(.caption).foregroundStyle(.orange) }
+            Button {
+                if expandedPlayerIds.contains(player.id) {
+                    expandedPlayerIds.remove(player.id)
+                } else {
+                    expandedPlayerIds.insert(player.id)
+                }
+            } label: {
+                HStack {
+                    if isTurn { Circle().fill(.green).frame(width: 8, height: 8) }
+                    Text(player.name).font(.subheadline.bold())
+                    if player.id == vm.dealer?.id { Text("★").foregroundStyle(.yellow) }
+                    Spacer()
+                    if player.id == vm.room.golfKnockedBy { Text("knocked").font(.caption).foregroundStyle(.orange) }
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
             }
-            LazyVGrid(columns: [GridItem(.fixed(40)), GridItem(.fixed(40))], spacing: 4) {
-                ForEach(Array(player.hand.prefix(4).enumerated()), id: \.offset) { _, card in
-                    CardView(card: card, width: 40, backColor: vm.room.backColor)
+            .buttonStyle(.plain)
+            .disabled(vm.golfRevealed)
+
+            if isExpanded {
+                LazyVGrid(columns: [GridItem(.fixed(40)), GridItem(.fixed(40))], spacing: 4) {
+                    ForEach(Array(player.hand.prefix(4).enumerated()), id: \.offset) { _, card in
+                        CardView(card: card, width: 40, backColor: vm.room.backColor)
+                    }
                 }
             }
         }
