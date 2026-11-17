@@ -1,83 +1,77 @@
 import SwiftUI
 
-/// First real screen: enter a 4-character room code created on *either* client (this app or
-/// the web app) and confirm it resolves to a live room — proves the shared-backend path works
-/// end to end before any game UI gets built on top of it.
+/// Join a room by its 4-character code — mirrors `joinRoom()` in `src/pages/Landing.tsx`:
+/// inserts a real player row (or reuses this device's existing one if rejoining), not just a
+/// read-only lookup.
 struct JoinRoomView: View {
+    let onJoined: (Room, Player) -> Void
+
     @State private var code = ""
-    @State private var room: Room?
     @State private var errorMessage: String?
     @State private var isLoading = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Text("Card Room")
-                    .font(.largeTitle.bold())
+        VStack(spacing: 20) {
+            Spacer()
 
-                TextField("Room code", text: $code)
-                    .textCase(.uppercase)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.characters)
-                    .multilineTextAlignment(.center)
-                    .font(.title2.monospaced())
-                    .padding()
-                    .background(.gray.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 40)
-                    .onChange(of: code) { _, newValue in
-                        code = String(newValue.prefix(4))
-                    }
+            Text("Card Room")
+                .font(.largeTitle.bold())
 
-                Button {
-                    Task { await joinRoom() }
-                } label: {
-                    if isLoading {
-                        ProgressView()
-                    } else {
-                        Text("Join Room")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(code.count != 4 || isLoading)
+            TextField("Room code", text: $code)
+                .textCase(.uppercase)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.characters)
+                .multilineTextAlignment(.center)
+                .font(.title2.monospaced())
+                .padding()
+                .background(.gray.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 40)
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                        .font(.footnote)
+                .onChange(of: code) { _, newValue in
+                    code = String(newValue.prefix(4))
                 }
 
-                if let room {
-                    VStack(spacing: 4) {
-                        Text("Found room \(room.code)").bold()
-                        Text(room.gameName ?? "No game selected yet")
-                            .foregroundStyle(.secondary)
-                        Text("State: \(room.state.rawValue)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top)
+            Button {
+                Task { await join() }
+            } label: {
+                if isLoading {
+                    ProgressView()
+                } else {
+                    Text("Join Room")
+                        .frame(maxWidth: .infinity)
                 }
             }
-            .padding()
+            .buttonStyle(.borderedProminent)
+            .disabled(code.count != 4 || isLoading)
+            .padding(.horizontal, 40)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .foregroundStyle(.red)
+                    .font(.footnote)
+            }
+
+            Spacer()
+            Spacer()
         }
+        .padding()
     }
 
-    private func joinRoom() async {
+    private func join() async {
         errorMessage = nil
         isLoading = true
         defer { isLoading = false }
         do {
-            room = try await RoomService.fetchRoom(code: code)
+            // Only used if this is a brand-new player (joinOrRejoin ignores it when reusing an
+            // existing seat) — no name customization UI yet, matching this pass's scope.
+            let (room, player) = try await RoomService.joinOrRejoin(code: code, playerName: FunName.generate())
+            onJoined(room, player)
         } catch {
-            room = nil
             errorMessage = error.localizedDescription
         }
     }
 }
 
 #Preview {
-    JoinRoomView()
+    JoinRoomView(onJoined: { _, _ in })
 }

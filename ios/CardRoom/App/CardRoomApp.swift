@@ -4,7 +4,7 @@ import SwiftUI
 struct CardRoomApp: App {
     var body: some Scene {
         WindowGroup {
-            JoinRoomView()
+            RootView()
         }
     }
 }
