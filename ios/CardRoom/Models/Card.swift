@@ -4,6 +4,16 @@ import Foundation
 /// since both clients read/write the same `rooms`/`players` rows.
 enum Suit: String, Codable {
     case spades, hearts, diamonds, clubs
+
+    /// Mirrors `SUIT_SYMBOLS` in `src/lib/deck.ts` — used in action-log messages.
+    var symbol: String {
+        switch self {
+        case .spades: return "♠"
+        case .hearts: return "♥"
+        case .diamonds: return "♦"
+        case .clubs: return "♣"
+        }
+    }
 }
 
 /// Mirrors `Rank` in card-room's `src/types.ts`.

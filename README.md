@@ -119,9 +119,45 @@ could have caught:
   `card-room/supabase-schema.sql` (`code` is now plain `text`); no app code on either client
   needed to change.
 
+Golf's verification (see next section) caught a third, more serious one:
+- **Swift's synthesized `Encodable` silently drops a `nil` optional field instead of encoding
+  `null`** — confirmed directly: `JSONEncoder().encode(Wrapper(x: nil as String?))` produces
+  `{}`, not `{"x":null}`. PostgREST's PATCH endpoint treats an *absent* key as "don't touch this
+  column" but an explicit `null` as "set it to NULL", so every update struct with a plain `T?`
+  field meant to clear a nullable column (`current_turn`, `golf_knocked_by`) was a silent no-op
+  whenever it actually needed to write `null`. Caught because Golf's round-end reveal
+  (`GolfService.endTurn` setting `current_turn` back to `nil` once play wraps around to whoever
+  knocked) just never took effect — the turn indicator stayed stuck on the last player forever.
+  Fixed with a reusable `NullableField<T>: Encodable` wrapper (`Networking/NullableField.swift`)
+  that always encodes an explicit `null`; every `T?` update field that can legitimately mean
+  "clear this column" now uses it instead of a bare `T?`. This was a latent bug in the Blackjack
+  code too (`hit`/`stand`'s `current_turn` writes), just never hit by anything that actually
+  passed `nil` through those paths in testing.
+
+### Golf
+Full feature parity with the web app's Golf mode: pre-game 2-peek phase with a dealer-gated
+"Start Game" (ghosted until everyone's peeked), draw-from-deck-or-discard, swap-or-discard,
+Knock!/End Turn (ghosted until the drawn card's resolved, same as the web app), and round
+results sorted lowest-score-wins with the knocker labeled. `GameLogic/Deck.swift` ports
+`golfHandValue`/`createGolfJokers` from `src/lib/deck.ts`; `Networking/GolfService.swift` ports
+the "--- Golf ---" section of `src/pages/Game.tsx`. Hardcodes the built-in preset's scoring
+rules (`zeroRank: Q`, `pairsCancel: false`) rather than reading a per-room config — this app
+doesn't implement the web app's AI-custom-game designer at all, so there's nothing else to read
+them from.
+
+Verified two ways: a real-device screenshot of the pre-game peek screen (correct deck math,
+correct peek budget, correctly ghosted Start button) via the `CARDROOM_AUTOJOIN_CODE` hook, and
+a full logic round-trip using the CLI-executable technique above, extended into a small
+multi-command driver (`join`/`peek`/`draw-deck`/`swap`/`discard-drawn`/`end-turn`/`knock`) so it
+could be interleaved step-by-step with a Playwright-driven web dealer — peek, start, draw, swap,
+discard, knock, and the final reveal, cross-checked against the web client's own screen the
+whole way (matching Action History text, matching final scores computed independently by each
+client from the same hands). That's what caught the `NullableField` bug above.
+
 ### Not yet built
-Golf (rules + UI), the lobby's game-mode picker (Blackjack is dealt unconditionally right now),
-redeal/"Play Again", any other game mode, card-art assets, and theming. All of
+The lobby's deal flow only offers Blackjack and Golf (matching `ENABLED_GAME_IDS` on the web
+app) — redeal/"Play Again", any other game mode, card-art assets, and theming are still
+missing. All of
 `card-room/src/pages/Game.tsx` and `src/lib/games.ts`'s remaining logic needs a native
 equivalent here — none of that TypeScript is reused, by design.
 

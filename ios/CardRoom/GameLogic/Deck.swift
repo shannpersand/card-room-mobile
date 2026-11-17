@@ -43,4 +43,45 @@ enum Deck {
         }
         return active[(idx + 1) % active.count].id
     }
+
+    /// Golf: the 2 jokers added to a standard deck — not part of `createDeck()` since no other
+    /// game uses them.
+    static func createGolfJokers() -> [Card] {
+        [
+            Card(id: "Joker-spades", suit: .spades, rank: .joker, faceUp: true),
+            Card(id: "Joker-hearts", suit: .hearts, rank: .joker, faceUp: true),
+        ]
+    }
+
+    /// Row/column pairs within Golf's 2×2 grid (0/1 top row, 2/3 bottom row) — deliberately
+    /// excludes the two diagonals (0,3) and (1,2).
+    private static let golfGridPairs: [(Int, Int)] = [(0, 1), (2, 3), (0, 2), (1, 3)]
+
+    private static func golfCardValue(_ rank: Rank, zeroRank: GolfZeroRank) -> Int {
+        if rank.rawValue == zeroRank.rawValue { return 0 }
+        switch rank {
+        case .joker: return 10
+        case .two: return -2
+        case .ace: return 1
+        case .jack, .queen, .king: return 10
+        default: return Int(rank.rawValue) ?? 0
+        }
+    }
+
+    /// Golf hand value: face value for number cards, J/Q/K = 10 except whichever rank is
+    /// `zeroRank` (worth 0), 2 = -2, Joker = 10, Ace = 1. When `pairsCancel` is set, two cards
+    /// of the same rank sharing a row or column (not diagonal) both score 0 instead.
+    static func golfHandValue(_ hand: [Card], zeroRank: GolfZeroRank = .queen, pairsCancel: Bool = false) -> Int {
+        let values = hand.map { golfCardValue($0.rank, zeroRank: zeroRank) }
+
+        if pairsCancel && hand.count == 4 {
+            var canceled = Set<Int>()
+            for (a, b) in golfGridPairs where hand[a].rank == hand[b].rank {
+                canceled.insert(a); canceled.insert(b)
+            }
+            return values.enumerated().reduce(0) { total, pair in canceled.contains(pair.offset) ? total : total + pair.element }
+        }
+
+        return values.reduce(0, +)
+    }
 }

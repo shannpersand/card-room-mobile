@@ -1,10 +1,17 @@
 import SwiftUI
 
-/// Mirrors the bare essentials of `src/pages/Lobby.tsx`: the player list and the dealer's
-/// "deal cards" control. Only Blackjack is wired up — the web app's game picker, AI "describe a
-/// game" flow, and Saved Games are all out of scope for this pass (see README).
+private enum GameChoice: String, CaseIterable, Identifiable {
+    case blackjack = "Blackjack"
+    case golf = "Golf"
+    var id: String { rawValue }
+}
+
+/// Mirrors the bare essentials of `src/pages/Lobby.tsx`: the player list, a game-mode picker,
+/// and the dealer's "deal cards" control. The web app's AI "describe a game" flow and Saved
+/// Games are out of scope for this pass (see README).
 struct LobbyView: View {
     @ObservedObject var vm: RoomViewModel
+    @State private var choice: GameChoice = .blackjack
 
     var body: some View {
         VStack(spacing: 24) {
@@ -38,13 +45,24 @@ struct LobbyView: View {
             Spacer()
 
             if vm.isDealer {
+                Picker("Game", selection: $choice) {
+                    ForEach(GameChoice.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 40)
+
                 Button {
-                    Task { await vm.dealBlackjack() }
+                    Task {
+                        switch choice {
+                        case .blackjack: await vm.dealBlackjack()
+                        case .golf: await vm.dealGolf()
+                        }
+                    }
                 } label: {
                     if vm.isDealing {
                         ProgressView()
                     } else {
-                        Text("Deal Blackjack").frame(maxWidth: .infinity)
+                        Text("Deal \(choice.rawValue)").frame(maxWidth: .infinity)
                     }
                 }
                 .buttonStyle(.borderedProminent)

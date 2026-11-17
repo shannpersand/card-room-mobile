@@ -3,7 +3,7 @@ import Supabase
 
 private struct RoomDeckTurnUpdate: Encodable {
     let deck: [Card]
-    let currentTurn: String?
+    let currentTurn: NullableField<String>
 
     enum CodingKeys: String, CodingKey {
         case deck
@@ -45,7 +45,7 @@ enum GameService {
 
         try await supabase
             .from("rooms")
-            .update(RoomDeckTurnUpdate(deck: deck, currentTurn: busted ? Deck.nextPlayer(in: orderedPlayers, after: player.id) : room.currentTurn))
+            .update(RoomDeckTurnUpdate(deck: deck, currentTurn: NullableField(busted ? Deck.nextPlayer(in: orderedPlayers, after: player.id) : room.currentTurn)))
             .eq("id", value: room.id)
             .execute()
         try await supabase
@@ -70,7 +70,7 @@ enum GameService {
             .execute()
         try await supabase
             .from("rooms")
-            .update(RoomDeckTurnUpdate(deck: room.deck, currentTurn: nextTurn))
+            .update(RoomDeckTurnUpdate(deck: room.deck, currentTurn: NullableField(nextTurn)))
             .eq("id", value: room.id)
             .execute()
         await RoomService.logAction(roomId: room.id, entry: "\(player.name) stood on \(Deck.blackjackValue(player.hand))")

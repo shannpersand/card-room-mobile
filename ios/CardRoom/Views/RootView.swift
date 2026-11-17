@@ -36,7 +36,11 @@ private struct ConnectedRoomView: View {
 
     var body: some View {
         if vm.room.state == .playing {
-            GameView(vm: vm)
+            if vm.room.gameId == "golf" {
+                GolfView(vm: vm)
+            } else {
+                GameView(vm: vm)
+            }
         } else {
             LobbyView(vm: vm)
         }
