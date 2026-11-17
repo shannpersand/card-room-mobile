@@ -72,7 +72,7 @@ struct GolfView: View {
             }
             LazyVGrid(columns: [GridItem(.fixed(40)), GridItem(.fixed(40))], spacing: 4) {
                 ForEach(Array(player.hand.prefix(4).enumerated()), id: \.offset) { _, card in
-                    CardView(card: card, width: 40)
+                    CardView(card: card, width: 40, backColor: vm.room.backColor)
                 }
             }
         }
@@ -88,7 +88,7 @@ struct GolfView: View {
                 Button {
                     Task { await vm.golfDrawFromDeck() }
                 } label: {
-                    CardView(card: Card(id: "draw-pile", suit: .spades, rank: .ace, faceUp: false), width: 52)
+                    CardView(card: Card(id: "draw-pile", suit: .spades, rank: .ace, faceUp: false), width: 52, backColor: vm.room.backColor)
                 }
                 .disabled(!canDraw || vm.room.deck.isEmpty)
                 Text("Draw · \(vm.room.deck.count)").font(.caption).foregroundStyle(.secondary)
@@ -134,7 +134,7 @@ struct GolfView: View {
                     Button {
                         Task { await vm.golfTapCard(card, idx: idx) }
                     } label: {
-                        CardView(card: Card(id: card.id, suit: card.suit, rank: card.rank, faceUp: card.faceUp || peeking), isOwner: false, width: 70)
+                        CardView(card: Card(id: card.id, suit: card.suit, rank: card.rank, faceUp: card.faceUp || peeking), isOwner: false, width: 70, backColor: vm.room.backColor)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(peeking ? .blue : .clear, lineWidth: 2)

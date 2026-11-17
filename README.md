@@ -76,11 +76,32 @@ verified" below), not just that it compiles.
   (shared by both `LobbyView` and `GameView`, since they're really two perspectives on the same
   subscription): subscribes to `rooms` UPDATE and `players` INSERT/UPDATE/DELETE via
   supabase-swift's Realtime v2 API, runs the 10s heartbeat, and exposes the Lobby/Game actions.
-- `Views/` — `JoinRoomView` (real join, not just a lookup), `LobbyView` (player list + the
-  dealer's "Deal Blackjack" button), `GameView` (hands, turn indicator, Hit/Stand, round
-  results), `CardView` (a plain native placeholder — no card-art assets ported from the web
-  bundle yet), and `RootView`, which switches between the three purely off state (room `state`
-  flipping to `.playing` is what moves you from Lobby to Game, not a navigation push).
+- `Views/` — `JoinRoomView` (real join, not just a lookup), `LobbyView` (player list + a
+  Blackjack/Golf game-mode picker), `GameView` (Blackjack: hands, turn indicator, Hit/Stand,
+  round results), `GolfView` (pre-game peek, draw/swap/discard, Knock!/End Turn, round results),
+  `CardView` (the real card art — see below), and `RootView`, which switches between the three
+  purely off state (room `state` flipping to `.playing` is what moves you from Lobby to Game,
+  not a navigation push).
+
+### Card art
+`Assets.xcassets` has the web app's actual card art (`card-room/src/assets/cards/*.svg`), not a
+placeholder — 52 fronts + joker + 6 pre-recolored card backs (one per `BackColorKey`, matching
+`BACK_COLORS` in `src/lib/cardArt.ts`), each as a real `@2x`/`@3x` imageset. `GameLogic/
+CardArt.swift` mirrors `cardFrontUrl`/`resolveBackColorHex`'s naming to pick the right asset
+name from a `Card`/`back_color` string.
+
+These are pre-rendered PNGs, not the SVGs themselves — **dragging the raw SVGs straight into an
+asset catalog silently produces a blank image**, confirmed empirically (built clean, no actool
+warning, rendered nothing at runtime) — Xcode's SVG-in-asset-catalog import doesn't handle a
+`<style>`-block-with-CSS-classes the way these particular files are authored. Converted instead
+by rendering each SVG in a real browser engine (Playwright/Chromium, already used for
+cross-client verification elsewhere in this project) and screenshotting it at 2x/3x device
+scale with a transparent background — not a tool this repo depends on at build time, just how
+the assets already checked into `Assets.xcassets` were produced once. Card backs are recolored
+by string-replacing the fill hex in the SVG text before rendering (same trick
+`recoloredBackSvg()` does at runtime on the web; here it happens once, ahead of time, since nothing
+drives it live), not at runtime, since there's no equivalent to the web's "fetch raw SVG text and
+patch it" trick for a flat PNG asset.
 
 ### How this was verified
 No UI-automation tool (no Accessibility permission for AppleScript, no `idb`) was available to
@@ -156,7 +177,7 @@ client from the same hands). That's what caught the `NullableField` bug above.
 
 ### Not yet built
 The lobby's deal flow only offers Blackjack and Golf (matching `ENABLED_GAME_IDS` on the web
-app) — redeal/"Play Again", any other game mode, card-art assets, and theming are still
+app) — redeal/"Play Again", any other game mode, and theming (the web app's 4 themes) are still
 missing. All of
 `card-room/src/pages/Game.tsx` and `src/lib/games.ts`'s remaining logic needs a native
 equivalent here — none of that TypeScript is reused, by design.

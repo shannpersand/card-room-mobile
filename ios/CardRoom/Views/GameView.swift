@@ -70,7 +70,7 @@ struct GameView: View {
             }
             HStack(spacing: 4) {
                 ForEach(player.hand) { card in
-                    CardView(card: card, width: 40)
+                    CardView(card: card, width: 40, backColor: vm.room.backColor)
                 }
             }
         }
