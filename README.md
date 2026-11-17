@@ -84,14 +84,40 @@ verified" below), not just that it compiles.
 
 ### How this was verified
 No UI-automation tool (no Accessibility permission for AppleScript, no `idb`) was available to
-drive the simulator's keyboard from a script, so the interactive join screen was confirmed
-visually once, and the rest was verified a stronger way: the exact same `Models`/`GameLogic`/
+drive the simulator's keyboard from a script. First pass: the exact same `Models`/`GameLogic`/
 `Networking` source files were built as a standalone Swift Package executable and run against
 the real Supabase project — joining a room the web app's dealer had created, decoding the hands
-the *web* app's `dealGame()` actually dealt, hitting and standing, and then confirming on the
-web client's own screen that its Action History showed those exact actions in real time. That's
-what caught the `golf_ready` issue above; it also proves actual cross-client data compatibility,
-not just "the Swift compiles."
+the *web* app's `dealGame()` actually dealt, hitting and standing, and confirming on the web
+client's own screen that its Action History showed those exact actions in real time. That caught
+the `golf_ready` issue above, and proves real cross-client data compatibility — but it only
+exercises the service layer, not the actual SwiftUI view tree, which let a real view-layer bug
+ship unnoticed (see below). Second pass, added after that: `JoinRoomView` has a `#if DEBUG`-only
+hook that auto-joins a room code from the `CARDROOM_AUTOJOIN_CODE` environment variable on
+launch —
+```sh
+SIMCTL_CHILD_CARDROOM_AUTOJOIN_CODE=<code> xcrun simctl launch booted com.cardroom.app
+```
+drives the *real* compiled app (not a CLI stand-in) through Join → Lobby → Game, screenshotted
+at each step, with the web app dealing from the other side. Compiled out of release builds
+entirely; harmless if the env var is never set.
+
+Two real bugs were caught and fixed this way, neither of which the service-layer-only CLI test
+could have caught:
+- **`RootView` held the shared `RoomViewModel` in plain `@State`, not `@ObservedObject`.**
+  `LobbyView`/`GameView` both correctly re-rendered on realtime updates (they use
+  `@ObservedObject`), but `RootView`'s own `if room.state == .playing { GameView } else {
+  LobbyView }` branch never re-evaluated when `state` changed internally — only `@State`
+  reassigning the optional itself (nil → an instance) triggers a re-render, not a mutation
+  *inside* an already-held reference. Symptom: the Lobby's player list updated live just fine,
+  but dealing from the web app never flipped the iOS app over to the Game screen. Fixed by
+  moving the `if` into a small child view that holds `vm` as `@ObservedObject`.
+- **`rooms.code` was `char(4)` (fixed-length/"bpchar")**, not an iOS bug at all but only
+  reachable *through* iOS: a plain PostgREST `SELECT` always returned the correct 4-character
+  value, but Realtime's logical-replication-based change feed delivered only the first
+  character — consistent with `bpchar`'s OID occasionally getting confused with Postgres's
+  unrelated 1-byte `"char"` internal type in replication tooling. Fixed at the schema level in
+  `card-room/supabase-schema.sql` (`code` is now plain `text`); no app code on either client
+  needed to change.
 
 ### Not yet built
 Golf (rules + UI), the lobby's game-mode picker (Blackjack is dealt unconditionally right now),

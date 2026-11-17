@@ -48,7 +48,16 @@ final class RoomViewModel: ObservableObject {
         let roomUpdates = ch.postgresChange(UpdateAction.self, schema: "public", table: "rooms", filter: .eq("id", value: room.id))
         let playerChanges = ch.postgresChange(AnyAction.self, schema: "public", table: "players", filter: .eq("room_id", value: room.id))
 
-        subscribeTask = Task { try? await ch.subscribeWithError() }
+        subscribeTask = Task {
+            do {
+                try await ch.subscribeWithError()
+            } catch {
+                // A silent failure here looks identical to a real logic bug (e.g. the room's
+                // view just never advancing) — surfacing it directly, even crudely, is worth
+                // far more than swallowing it the way a bare `try?` would.
+                print("[RoomViewModel] Realtime subscribe failed: \(error)")
+            }
+        }
 
         roomSyncTask = Task { [weak self] in
             guard let self else { return }

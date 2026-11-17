@@ -55,6 +55,18 @@ struct JoinRoomView: View {
             Spacer()
         }
         .padding()
+        #if DEBUG
+        // Scripted end-to-end testing hook only — lets `simctl launch` with
+        // `SIMCTL_CHILD_CARDROOM_AUTOJOIN_CODE=<code>` drive a real join through the actual
+        // view tree (not just the service layer) without any UI-automation tooling installed.
+        // Compiled out of release builds entirely; does nothing unless that env var is set.
+        .task {
+            if let autoJoinCode = ProcessInfo.processInfo.environment["CARDROOM_AUTOJOIN_CODE"] {
+                code = autoJoinCode
+                await join()
+            }
+        }
+        #endif
     }
 
     private func join() async {
